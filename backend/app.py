@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import sqlite3
 import pandas as pd
+import os
 
 TABLE_NAME = "pois"
 
@@ -132,6 +133,88 @@ def get_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# -----------------------------
+# Load CSV into database
+# -----------------------------
+@app.route('/api/load_csv', methods=['POST'])
+def load_csv():
+    data = request.get_json()
+    file_path = data.get('file_path')
+
+    if not file_path:
+        return jsonify({'error': 'file_path is required'}), 400
+    if not os.path.exists(file_path):
+        return jsonify({'error': f'File not found: {file_path}'}), 404
+
+    try:
+        # Read CSV file
+        df = pd.read_csv(file_path)
+
+        # Ensure correct column names
+        expected_cols = {'name', 'city', 'visits'}
+        if not expected_cols.issubset(df.columns):
+            return jsonify({'error': f'CSV must include columns: {expected_cols}'}), 400
+
+        # Connect to DB and overwrite data
+        conn = get_db_connection()
+        df.to_sql('pois', conn, if_exists='replace', index=False)
+        conn.close()
+
+        return jsonify({
+            'message': 'CSV loaded successfully',
+            'rows': len(df)
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+
+# -----------------------------
+# Upload CSV file from frontend
+# -----------------------------
+@app.route('/api/load_csv_upload', methods=['POST'])
+def load_csv_upload():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part in request'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    try:
+        df = pd.read_csv(file)
+
+        # Ensure expected columns
+        expected_cols = {'name', 'city', 'visits'}
+        if not expected_cols.issubset(df.columns):
+            return jsonify({'error': f'CSV must include columns: {expected_cols}'}), 400
+
+        conn = get_db_connection()
+
+        # Check if table exists
+        conn.execute(f'''
+            CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT,
+                city TEXT,
+                visits INTEGER
+            )
+        ''')
+
+        # Insert rows (append, don’t replace)
+        for _, row in df.iterrows():
+            conn.execute(
+                f'INSERT INTO {TABLE_NAME} (name, city, visits) VALUES (?, ?, ?)',
+                (row['name'], row['city'], int(row['visits']))
+            )
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'message': 'CSV uploaded successfully and data added to existing table',
+            'rows': len(df)
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # -----------------------------
 if __name__ == '__main__':

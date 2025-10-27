@@ -19,7 +19,9 @@ function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [stats, setStats] = useState(null);
-
+  const [csvFile, setCsvFile] = useState(null);
+  const [uploadMessage, setUploadMessage] = useState("");
+  
   // ===== Fetch POIs =====
   const fetchPois = (resetPage = true) => {
     fetch(API_BASE)
@@ -139,6 +141,38 @@ function App() {
     }
   };
 
+  // ===== CSV Upload =====
+  const handleCsvUpload = async (e) => {
+    e.preventDefault();
+    if (!csvFile) {
+      alert("Please choose a CSV file first.");
+      return;
+    }
+  
+    const formData = new FormData();
+    formData.append("file", csvFile);
+  
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/load_csv_upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+  
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+  
+      setUploadMessage(`✅ ${data.message} (${data.rows} rows)`);
+      fetchPois();
+      fetchStats();
+    } catch (err) {
+      setUploadMessage(`❌ ${err.message}`);
+    } finally {
+      // Reset file input so the user can upload another file
+      setCsvFile(null);
+      e.target.reset?.(); // resets the <form> fields (modern browsers)
+    }
+  };
+  
   // ===== Filtering =====
   const filteredPois = pois.filter(
     (p) =>
@@ -169,6 +203,27 @@ function App() {
   return (
     <div style={{ padding: "2rem", fontFamily: "Arial" }}>
       <h1>POI Dashboard</h1>
+      {/* ===== CSV Upload Section ===== */}
+      <div style={{
+        marginBottom: "2rem",
+        padding: "1rem",
+        border: "1px solid #ddd",
+        borderRadius: "8px",
+        background: "#f9f9f9"
+      }}>
+        <h3>📁 Upload CSV Data</h3>
+        <form onSubmit={handleCsvUpload} style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+          <input
+            type="file"
+            accept=".csv"
+            onChange={(e) => setCsvFile(e.target.files[0])}
+          />
+          <button type="submit">Upload</button>
+        </form>
+        {uploadMessage && (
+          <div style={{ marginTop: "0.5rem" }}>{uploadMessage}</div>
+        )}
+      </div>
       {/* ===== Dashboard Section ===== */}
       {stats && (
         <div
