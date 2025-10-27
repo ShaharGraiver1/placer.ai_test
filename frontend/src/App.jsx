@@ -17,6 +17,7 @@ function App() {
   const [sortDirection, setSortDirection] = useState("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [stats, setStats] = useState(null);
 
   // ===== Fetch POIs =====
   const fetchPois = (resetPage = true) => {
@@ -32,9 +33,18 @@ function App() {
         alert("Failed to load data");
       });
   };
-
+  
+  // ===== Fetch Stats =====
+  const fetchStats = () => {
+    fetch("http://127.0.0.1:5000/api/stats")
+      .then((res) => res.json())
+      .then((data) => setStats(data))
+      .catch((err) => console.error("Failed to fetch stats:", err));
+  };
+  
   useEffect(() => {
     fetchPois();
+    fetchStats();
   }, []);
 
   // ===== Add new POI =====
@@ -59,6 +69,7 @@ function App() {
         setCity("");
         setVisits("");
         fetchPois();
+        fetchStats();
       })
       .catch((err) => alert(err.message));
   };
@@ -72,7 +83,10 @@ function App() {
         if (!res.ok) throw new Error("Failed to delete");
         return res.json();
       })
-      .then(() => fetchPois(false))
+      .then(() => {
+        fetchPois(false);
+        fetchStats();
+      })      
       .catch((err) => alert(err.message));
   };
 
@@ -97,6 +111,7 @@ function App() {
       .then(() => {
         setEditingId(null);
         fetchPois(false);
+        fetchStats();
       })
       .catch((err) => alert(err.message));
   };
@@ -143,6 +158,30 @@ function App() {
   return (
     <div style={{ padding: "2rem", fontFamily: "Arial" }}>
       <h1>POI Dashboard</h1>
+      {/* ===== Dashboard Section ===== */}
+      {stats && (
+        <div
+          style={{
+            display: "flex",
+            gap: "2rem",
+            marginBottom: "2rem",
+            background: "#f8f9fa",
+            padding: "1rem",
+            borderRadius: "8px",
+            justifyContent: "space-around",
+          }}
+        >
+          <div>
+            <strong>Total Visits:</strong> {stats.total_visits}
+          </div>
+          <div>
+            <strong>Average Visits:</strong> {stats.avg_visits}
+          </div>
+          <div>
+            <strong>Top City:</strong> {stats.top_city} ({stats.top_city_visits})
+          </div>
+        </div>
+      )}
 
       {/* ===== Add new POI form ===== */}
       <form onSubmit={handleSubmit} style={{ marginBottom: "1.5rem", display: "flex", gap: "1rem" }}>

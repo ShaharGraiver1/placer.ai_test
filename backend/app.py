@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import sqlite3
+import pandas as pd
 
 TABLE_NAME = "pois"
 
@@ -94,6 +95,40 @@ def update_poi(poi_id):
             return jsonify({'error': 'POI not found'}), 404
 
         return jsonify({'message': 'POI updated successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# -----------------------------
+# Computes KPIs (total, average, top city)
+# -----------------------------
+@app.route('/api/stats', methods=['GET'])
+def get_stats():
+    try:
+        conn = get_db_connection()
+        df = pd.read_sql_query('SELECT * FROM pois', conn)
+        conn.close()
+
+        if df.empty:
+            return jsonify({
+                'total_visits': 0,
+                'avg_visits': 0,
+                'top_city': None
+            })
+
+        total_visits = int(df['visits'].sum())
+        avg_visits = round(df['visits'].mean(), 2)
+
+        # Group by city to find which city has the highest total visits
+        top_city_row = df.groupby('city')['visits'].sum().sort_values(ascending=False).head(1)
+        top_city = top_city_row.index[0]
+        top_city_visits = int(top_city_row.iloc[0])
+
+        return jsonify({
+            'total_visits': total_visits,
+            'avg_visits': avg_visits,
+            'top_city': top_city,
+            'top_city_visits': top_city_visits
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
