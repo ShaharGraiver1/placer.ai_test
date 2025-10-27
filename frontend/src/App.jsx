@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 const API_BASE = "http://127.0.0.1:5000/api/pois";
 
@@ -41,6 +42,16 @@ function App() {
       .then((data) => setStats(data))
       .catch((err) => console.error("Failed to fetch stats:", err));
   };
+
+  // ===== Create chartData =====
+  const chartData = (() => {
+    const cityTotals = {};
+    pois.forEach((p) => {
+      if (!cityTotals[p.city]) cityTotals[p.city] = 0;
+      cityTotals[p.city] += p.visits;
+    });
+    return Object.entries(cityTotals).map(([city, visits]) => ({ city, visits }));
+  })();
   
   useEffect(() => {
     fetchPois();
@@ -182,6 +193,20 @@ function App() {
           </div>
         </div>
       )}
+      {/* ===== Bar Chart: Visits per City ===== */}
+      <div style={{ marginBottom: "2rem" }}>
+        <h3>Visits per City</h3>
+        <div style={{ height: 300, width: "100%", background: "#fafafa", borderRadius: "8px", padding: "1rem" }}>
+          <ResponsiveContainer>
+            <BarChart data={chartData}>
+              <XAxis dataKey="city" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="visits" fill="#007BFF" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
 
       {/* ===== Add new POI form ===== */}
       <form onSubmit={handleSubmit} style={{ marginBottom: "1.5rem", display: "flex", gap: "1rem" }}>
